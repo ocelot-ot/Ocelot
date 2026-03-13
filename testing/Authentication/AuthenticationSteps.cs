@@ -24,7 +24,7 @@ public class AuthenticationSteps : AcceptanceSteps
 {
     protected BearerToken? token;
     private readonly Dictionary<string, WebApplication> _jwtSigningServers;
-    protected string JwtSigningServerUrl => _jwtSigningServers.First().Key;
+    public string JwtSigningServerUrl { get => _jwtSigningServers.First().Key; }
 
     public AuthenticationSteps() : base()
     {
@@ -59,7 +59,7 @@ public class AuthenticationSteps : AcceptanceSteps
         };
     }
 
-    protected void WithJwtBearerAuthentication(IServiceCollection services)
+    public void WithJwtBearerAuthentication(IServiceCollection services)
         => WithJwtBearerAuthentication(services, true);
     public void WithJwtBearerAuthentication(IServiceCollection services, bool addOcelot)
     {
@@ -169,8 +169,8 @@ public class AuthenticationSteps : AcceptanceSteps
         return token = await GivenToken(auth, path);
     }
 
-    protected readonly Dictionary<string, AuthenticationTokenRequest> AuthTokens = [];
-    protected AuthenticationTokenRequest AuthToken => AuthTokens.Count > 0 ? AuthTokens.First().Value : new();
+    public readonly Dictionary<string, AuthenticationTokenRequest> AuthTokens = [];
+    public AuthenticationTokenRequest AuthToken => AuthTokens.Count > 0 ? AuthTokens.First().Value : new();
     public event EventHandler<AuthenticationTokenRequestEventArgs>? AuthTokenRequesting;
     protected virtual void OnAuthenticationTokenRequest(AuthenticationTokenRequestEventArgs e)
         => AuthTokenRequesting?.Invoke(this, e);
