@@ -125,6 +125,46 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
     }
 
     [Fact]
+    public async Task Should_stop()
+    {
+        // Arrange
+        await _poller.StartAsync(CancellationToken.None);
+
+        // Act
+        await _poller.StopAsync(CancellationToken.None);
+
+        // Assert: no exception is thrown and the poller stops cleanly
+    }
+
+    [Fact]
+    public async Task Should_not_update_internal_config_if_internal_config_creator_errors()
+    {
+        // Arrange
+        _internalConfigCreator
+            .Setup(x => x.Create(It.IsAny<FileConfiguration>()))
+            .ReturnsAsync(new ErrorResponse<IInternalConfiguration>(new AnyError()));
+
+        // Act
+        await _poller.StartAsync(CancellationToken.None);
+
+        // Assert: Create is called but AddOrReplace is never called when the creator returns an error
+        var result = Wait.For(4_000).Until(() =>
+        {
+            try
+            {
+                _internalConfigCreator.Verify(x => x.Create(_fileConfig), Times.AtLeastOnce);
+                _internalConfigRepo.Verify(x => x.AddOrReplace(It.IsAny<IInternalConfiguration>()), Times.Never);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        });
+        result.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Should_dispose_cleanly_without_starting()
     {
         // Arrange, Act, Assert
