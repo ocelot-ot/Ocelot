@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -10,9 +11,11 @@ using Ocelot.Configuration.File;
 using Ocelot.DependencyInjection;
 using Ocelot.Middleware;
 using Shouldly;
+using System.Collections;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -64,6 +67,12 @@ public class AcceptanceSteps : IDisposable
 
     public virtual FileConfiguration GivenConfiguration(params FileRoute[] routes)
     {
+        //object? c = Ocelot.CreateFileConfiguration(out Type type);
+        //PropertyInfo? property = type.GetProperty("Routes");
+        //if (property?.GetValue(c) is IList list)
+        //    foreach (var route in routes)
+        //        list.Add(route);
+        //return c;
         var c = new FileConfiguration();
         c.Routes.AddRange(routes);
         return c;
@@ -73,12 +82,29 @@ public class AcceptanceSteps : IDisposable
     public virtual FileRoute GivenCatchAllRoute(int port) => GivenRoute(port, "/{everything}", "/{everything}");
     public virtual FileRoute GivenRoute(int port, string? upstream = null, string? downstream = null)
     {
+        // object? r = Ocelot.CreateFileRoute(out Type type);
         var r = new FileRoute();
+
         r.DownstreamHostAndPorts.Add(Localhost(port));
+        //PropertyInfo? property = type.GetProperty("DownstreamHostAndPorts");
+        //if (property?.GetValue(r) is IList downstreamHostAndPorts)
+        //    downstreamHostAndPorts.Add(Localhost(port));
+
         r.DownstreamPathTemplate = downstream ?? "/";
+        //property = type.GetProperty("DownstreamPathTemplate");
+        //property?.SetValue(r, downstream ?? "/");
+
         r.DownstreamScheme = Uri.UriSchemeHttp;
         r.UpstreamHttpMethod.Add(HttpMethods.Get);
         r.UpstreamPathTemplate = upstream ?? "/";
+        //property = type.GetProperty("UpstreamPathTemplate");
+        //property?.SetValue(r, upstream ?? "/");
+
+        r.UpstreamHttpMethod.Add(HttpMethods.Get);
+        //property = type.GetProperty("UpstreamHttpMethod");
+        //if (property?.GetValue(r) is IList upstreamHttpMethod)
+        //    upstreamHttpMethod.Add(HttpMethods.Get);
+
         return r;
     }
 
@@ -114,11 +140,13 @@ public class AcceptanceSteps : IDisposable
     {
         config.SetBasePath(hosting.HostingEnvironment.ContentRootPath);
         config.AddOcelot(ocelotConfigFileName, false, false);
+        //config.AddJsonFile(ocelotConfigFileName, false, false);
     }
     public void WithBasicConfiguration(WebHostBuilderContext hosting, IConfigurationBuilder config)
     {
         config.SetBasePath(hosting.HostingEnvironment.ContentRootPath);
         config.AddOcelot(ocelotConfigFileName, false, false);
+        //config.AddJsonFile(ocelotConfigFileName, false, false);
     }
 
     public static void WithAddOcelot(IServiceCollection services) => services.AddOcelot();
@@ -220,6 +248,10 @@ public class AcceptanceSteps : IDisposable
     private static void SetBaseUrl(FileConfiguration configuration, string baseUrl)
     {
         configuration.GlobalConfiguration.BaseUrl = baseUrl;
+        //var p1 = configuration?.GetType().GetProperty("GlobalConfiguration");
+        //var globalConfiguration = p1?.GetValue(configuration);
+        //var p2 = p1?.PropertyType.GetProperty("BaseUrl");
+        //p2?.SetValue(globalConfiguration, baseUrl);
     }
 
     protected async Task<int> GivenOcelotHostIsRunning(

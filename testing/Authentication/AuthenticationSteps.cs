@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Ocelot.Authorization;
 using Ocelot.Configuration.File;
 using Ocelot.DependencyInjection;
+using Ocelot.Testing.Boxing;
 using Shouldly;
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
@@ -173,6 +174,10 @@ public class AuthenticationSteps : AcceptanceSteps
     public event EventHandler<AuthenticationTokenRequestEventArgs>? AuthTokenRequesting;
     protected virtual void OnAuthenticationTokenRequest(AuthenticationTokenRequestEventArgs e)
         => AuthTokenRequesting?.Invoke(this, e);
+    public class AuthenticationTokenRequestEventArgs(AuthenticationTokenRequest request) : EventArgs
+    {
+        public AuthenticationTokenRequest Request { get; } = request;
+    }
 
     protected async Task<BearerToken?> GivenToken(AuthenticationTokenRequest auth, string path = "", string? issuerUrl = null)
     {
