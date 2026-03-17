@@ -50,6 +50,33 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
     }
 
     [Fact]
+    public async Task Should_not_replace_timer_when_start_called_twice()
+    {
+        // Arrange
+        await _poller.StartAsync(TestContext.Current.CancellationToken);
+        var timerAfterFirstStart = CurrentTimer();
+
+        // Act
+        await _poller.StartAsync(TestContext.Current.CancellationToken);
+        var timerAfterSecondStart = CurrentTimer();
+
+        // Assert
+        timerAfterFirstStart.ShouldNotBeNull();
+        timerAfterSecondStart.ShouldBeSameAs(timerAfterFirstStart);
+    }
+
+    [Fact]
+    public async Task Should_do_nothing_when_stop_called_before_start()
+    {
+        // Arrange, Act
+        await _poller.StopAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(PollingDelayInMs * 2, TestContext.Current.CancellationToken);
+
+        // Assert
+        NumberOfGetInvocations().ShouldBe(0);
+    }
+
+    [Fact]
     public void Should_call_setter_when_gets_new_config()
     {
         // Arrange
@@ -276,6 +303,15 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
     private int NumberOfGetInvocations()
     {
         return _repo.Invocations.Count(x => x.Method.Name == nameof(IFileConfigurationRepository.Get));
+    }
+
+    private Timer CurrentTimer()
+    {
+        var timerField = typeof(FileConfigurationPoller)
+            .GetField("_timer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        timerField.ShouldNotBeNull();
+        return timerField.GetValue(_poller) as Timer;
     }
 
     private void ThenTheProviderIsPolled()
