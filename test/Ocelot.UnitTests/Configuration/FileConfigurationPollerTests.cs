@@ -13,7 +13,7 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
     private readonly FileConfigurationPoller _poller;
     private readonly Mock<IOcelotLoggerFactory> _factory;
     private readonly Mock<IFileConfigurationRepository> _repo;
-    private readonly FileConfiguration _fileConfig;
+    private readonly FileConfiguration _initialFileConfig;
     private readonly Mock<IFileConfigurationPollerOptions> _config;
     private readonly Mock<IInternalConfigurationRepository> _internalConfigRepo;
     private readonly Mock<IInternalConfigurationCreator> _internalConfigCreator;
@@ -25,9 +25,9 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
         _factory = new Mock<IOcelotLoggerFactory>();
         _factory.Setup(x => x.CreateLogger<FileConfigurationPoller>()).Returns(logger.Object);
         _repo = new Mock<IFileConfigurationRepository>();
-        _fileConfig = new FileConfiguration();
+        _initialFileConfig = new FileConfiguration();
         _config = new Mock<IFileConfigurationPollerOptions>();
-        _repo.Setup(x => x.Get()).ReturnsAsync(new OkResponse<FileConfiguration>(_fileConfig));
+        _repo.Setup(x => x.Get()).ReturnsAsync(new OkResponse<FileConfiguration>(_initialFileConfig));
         _config.Setup(x => x.Delay).Returns(100);
         _internalConfig = new Mock<IInternalConfiguration>();
         _internalConfigRepo = new Mock<IInternalConfigurationRepository>();
@@ -37,13 +37,13 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
     }
 
     [Fact]
-    public void Should_start()
+    public void Should_start_and_poll_initial_configuration()
     {
         // Arrange, Act
         _poller.StartAsync(CancellationToken.None);
 
         // Assert
-        ThenTheSetterIsCalled(_fileConfig, 1);
+        ThenTheSetterIsCalled(_initialFileConfig, 1);
     }
 
     [Fact]
@@ -69,7 +69,18 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
 
         // Assert
         WhenTheConfigIsChanged(newConfig, 0);
-        ThenTheSetterIsCalledAtLeast(newConfig, 1);
+        ThenTheSetterIsCalled(newConfig, 1);
+    }
+
+    [Fact]
+    public void Should_not_call_setter_when_configuration_is_not_changed()
+    {
+        // Arrange, Act
+        _poller.StartAsync(CancellationToken.None);
+
+        // Assert
+        ThenTheSetterIsCalled(_initialFileConfig, 1);
+        ThenTheConfigIsNotAddedMoreThan(1);
     }
 
     [Fact]
@@ -94,12 +105,54 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
         _poller.StartAsync(CancellationToken.None);
 
         // Assert
-        WhenTheConfigIsChanged(newConfig, 10);
+        WhenTheConfigIsChanged(newConfig, 250);
         ThenTheSetterIsCalled(newConfig, 1);
     }
 
     [Fact]
     public void Should_do_nothing_if_call_to_provider_fails()
+    {
+        // Arrange, Act
+        WhenProviderErrors();
+        _poller.StartAsync(CancellationToken.None);
+
+        // Assert
+        ThenTheSetterIsNotCalled();
+    }
+
+    [Fact]
+    public void Should_not_add_to_internal_repo_if_internal_configuration_creation_fails()
+    {
+        // Arrange
+        var newConfig = new FileConfiguration
+        {
+            Routes = new List<FileRoute>
+            {
+                new()
+                {
+                    DownstreamHostAndPorts = new List<FileHostAndPort>
+                    {
+                        new("test", 80),
+                    },
+                },
+            },
+        };
+
+        _internalConfigCreator
+            .Setup(x => x.Create(It.IsAny<FileConfiguration>()))
+            .ReturnsAsync(new ErrorResponse<IInternalConfiguration>(new AnyError()));
+        _repo.Setup(x => x.Get()).ReturnsAsync(new OkResponse<FileConfiguration>(newConfig));
+
+        // Act
+        _poller.StartAsync(CancellationToken.None);
+
+        // Assert
+        ThenTheCreatorIsCalled(newConfig, 1);
+        ThenTheConfigIsNotAdded();
+    }
+
+    [Fact]
+    public void Should_stop_polling_when_stopped()
     {
         // Arrange
         var newConfig = new FileConfiguration
@@ -118,10 +171,15 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
 
         // Act
         _poller.StartAsync(CancellationToken.None);
-        WhenProviderErrors();
+        ThenTheSetterIsCalled(_initialFileConfig, 1);
+        _poller.StopAsync(CancellationToken.None);
+        Thread.Sleep(300);
+        WhenTheConfigIsChanged(newConfig, 0);
+        Thread.Sleep(300);
 
         // Assert
-        ThenTheSetterIsCalled(newConfig, 0);
+        ThenTheConfigIsNotAddedMoreThan(1);
+        ThenTheCreatorIsCalled(1);
     }
 
     [Fact]
@@ -164,14 +222,82 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
         result.ShouldBeTrue();
     }
 
-    private void ThenTheSetterIsCalledAtLeast(FileConfiguration fileConfig, int times)
+    private void ThenTheSetterIsNotCalled()
     {
         var result = Wait.For(4_000).Until(() =>
         {
             try
             {
-                _internalConfigRepo.Verify(x => x.AddOrReplace(_internalConfig.Object), Times.AtLeast(times));
-                _internalConfigCreator.Verify(x => x.Create(fileConfig), Times.AtLeast(times));
+                _internalConfigRepo.Verify(x => x.AddOrReplace(It.IsAny<IInternalConfiguration>()), Times.Never);
+                _internalConfigCreator.Verify(x => x.Create(It.IsAny<FileConfiguration>()), Times.Never);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        });
+        result.ShouldBeTrue();
+    }
+
+    private void ThenTheCreatorIsCalled(FileConfiguration fileConfig, int times)
+    {
+        var result = Wait.For(4_000).Until(() =>
+        {
+            try
+            {
+                _internalConfigCreator.Verify(x => x.Create(fileConfig), Times.Exactly(times));
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        });
+        result.ShouldBeTrue();
+    }
+
+    private void ThenTheCreatorIsCalled(int times)
+    {
+        var result = Wait.For(4_000).Until(() =>
+        {
+            try
+            {
+                _internalConfigCreator.Verify(x => x.Create(It.IsAny<FileConfiguration>()), Times.Exactly(times));
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        });
+        result.ShouldBeTrue();
+    }
+
+    private void ThenTheConfigIsNotAdded()
+    {
+        var result = Wait.For(4_000).Until(() =>
+        {
+            try
+            {
+                _internalConfigRepo.Verify(x => x.AddOrReplace(It.IsAny<IInternalConfiguration>()), Times.Never);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        });
+        result.ShouldBeTrue();
+    }
+
+    private void ThenTheConfigIsNotAddedMoreThan(int times)
+    {
+        var result = Wait.For(4_000).Until(() =>
+        {
+            try
+            {
+                _internalConfigRepo.Verify(x => x.AddOrReplace(_internalConfig.Object), Times.Exactly(times));
                 return true;
             }
             catch (Exception)
