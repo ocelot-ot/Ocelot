@@ -140,6 +140,30 @@ public sealed class FileConfigurationPollerTests : UnitTest, IDisposable
     }
 
     [Fact]
+    public async Task Should_return_early_on_timer_tick_when_polling_is_already_in_progress()
+    {
+        // Arrange
+        var getTaskSource = new TaskCompletionSource<Response<FileConfiguration>>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var getCallCount = 0;
+        _repo.Setup(x => x.Get()).Returns(() =>
+        {
+            Interlocked.Increment(ref getCallCount);
+            return getTaskSource.Task;
+        });
+
+        // Act
+        await _poller.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(PollingDelayInMs * 3, TestContext.Current.CancellationToken);
+
+        // Assert
+        getCallCount.ShouldBe(1);
+
+        // Cleanup
+        getTaskSource.SetResult(new OkResponse<FileConfiguration>(_initialFileConfig));
+        await _poller.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public void Should_do_nothing_if_call_to_provider_fails()
     {
         // Arrange, Act
