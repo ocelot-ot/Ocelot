@@ -351,6 +351,57 @@ public class OcelotMiddlewareExtensionsTests // : UnitTest
     }
 
     [Fact]
+    public async Task OnChange_WhenFileConfigChanges_CreatesAndStoresNewConfiguration()
+    {
+        // Arrange: capture the callback registered with OnChange
+        Action<FileConfiguration, string> capturedCallback = null;
+        _mockFileConfig
+            .Setup(x => x.OnChange(It.IsAny<Action<FileConfiguration, string>>()))
+            .Callback<Action<FileConfiguration, string>>(cb => capturedCallback = cb)
+            .Returns((IDisposable)null);
+
+        // Signal when AddOrReplace is invoked for the second time (the OnChange-triggered call)
+        var addOrReplaceCount = 0;
+        var onChangeCompletedTcs = new TaskCompletionSource();
+        _mockRepo
+            .Setup(x => x.AddOrReplace(It.IsAny<IInternalConfiguration>()))
+            .Callback<IInternalConfiguration>(_ =>
+            {
+                if (++addOrReplaceCount >= 2)
+                    onChangeCompletedTcs.TrySetResult();
+            })
+            .Returns(new OkResponse());
+
+        var builder = GivenLightweightApplicationBuilder();
+        await builder.UseOcelot((app, config) => { });
+
+        Assert.NotNull(capturedCallback);
+
+        // Act: simulate a configuration file change
+        capturedCallback(new FileConfiguration(), "default");
+
+        // Wait for the async void callback to complete
+        await onChangeCompletedTcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // Assert: Create and AddOrReplace are each called a second time for the changed config
+        _mockCreator.Verify(x => x.Create(It.IsAny<FileConfiguration>()), Times.Exactly(2));
+        _mockRepo.Verify(x => x.AddOrReplace(It.IsAny<IInternalConfiguration>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task UseOcelot_WhenConfigRepoGetReturnsNull_ThrowsException()
+    {
+        // Arrange: Get() returns null so ocelotConfiguration?.Data takes the null-conditional branch on line 145
+        _mockRepo.Setup(x => x.Get())
+            .Returns((Response<IInternalConfiguration>)null);
+
+        var builder = GivenLightweightApplicationBuilder();
+
+        // Act, Assert
+        await Assert.ThrowsAnyAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
+    }
+
+    [Fact]
     public async Task UseOcelot_WhenConfigCreatorReturnsError_ExceptionMessageContainsErrors()
     {
         // Arrange
