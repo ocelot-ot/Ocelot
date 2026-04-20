@@ -19,7 +19,7 @@ using System.Reflection;
 
 namespace Ocelot.UnitTests.Middleware;
 
-public class OcelotMiddlewareExtensionsTests : UnitTest
+public class OcelotMiddlewareExtensionsTests // : UnitTest
 {
     private readonly Mock<IInternalConfigurationCreator> _mockCreator;
     private readonly Mock<IInternalConfigurationRepository> _mockRepo;
