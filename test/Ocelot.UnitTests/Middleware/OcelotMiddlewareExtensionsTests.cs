@@ -66,8 +66,8 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var result = await builder.UseOcelot();
 
         // Assert
-        result.ShouldNotBeNull();
-        result.ShouldBe(builder);
+        Assert.NotNull(result);
+        Assert.Same(builder, result);
     }
 
     [Fact]
@@ -84,8 +84,8 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         });
 
         // Assert
-        result.ShouldNotBeNull();
-        actionInvoked.ShouldBeTrue();
+        Assert.NotNull(result);
+        Assert.True(actionInvoked);
     }
 
     [Fact]
@@ -99,8 +99,8 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var result = await builder.UseOcelot(action);
 
         // Assert
-        result.ShouldNotBeNull();
-        result.ShouldBe(builder);
+        Assert.NotNull(result);
+        Assert.Same(builder, result);
     }
 
     [Fact]
@@ -114,8 +114,8 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var result = await builder.UseOcelot(pipelineConfig);
 
         // Assert
-        result.ShouldNotBeNull();
-        result.ShouldBe(builder);
+        Assert.NotNull(result);
+        Assert.Same(builder, result);
     }
 
     [Fact]
@@ -132,8 +132,8 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         });
 
         // Assert
-        result.ShouldNotBeNull();
-        actionInvoked.ShouldBeTrue();
+        Assert.NotNull(result);
+        Assert.True(actionInvoked);
     }
 
     [Fact]
@@ -151,7 +151,7 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         }, expectedConfig);
 
         // Assert
-        receivedConfig.ShouldBe(expectedConfig);
+        Assert.Same(expectedConfig, receivedConfig);
     }
 
     [Fact]
@@ -168,8 +168,8 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         }, (OcelotPipelineConfiguration)null);
 
         // Assert
-        receivedConfig.ShouldNotBeNull();
-        receivedConfig.ShouldBeOfType<OcelotPipelineConfiguration>();
+        Assert.NotNull(receivedConfig);
+        Assert.IsType<OcelotPipelineConfiguration>(receivedConfig);
     }
 
     [Fact]
@@ -183,8 +183,8 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var result = await builder.UseOcelot(action);
 
         // Assert
-        result.ShouldNotBeNull();
-        result.ShouldBe(builder);
+        Assert.NotNull(result);
+        Assert.Same(builder, result);
     }
 
     [Fact]
@@ -197,8 +197,8 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         await builder.UseOcelot((app, config) => { }, new OcelotPipelineConfiguration());
 
         // Assert
-        builder.Properties.ContainsKey("analysis.NextMiddlewareName").ShouldBeTrue();
-        builder.Properties["analysis.NextMiddlewareName"].ShouldBe("TransitionToOcelotMiddleware");
+        Assert.True(builder.Properties.ContainsKey("analysis.NextMiddlewareName"));
+        Assert.Equal("TransitionToOcelotMiddleware", builder.Properties["analysis.NextMiddlewareName"]);
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var builder = GivenLightweightApplicationBuilder();
 
         // Act, Assert
-        await Should.ThrowAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
+        await Assert.ThrowsAnyAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
     }
 
     [Fact]
@@ -227,7 +227,7 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var builder = GivenLightweightApplicationBuilder();
 
         // Act, Assert
-        await Should.ThrowAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
+        await Assert.ThrowsAnyAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
     }
 
     [Fact]
@@ -240,7 +240,7 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var builder = GivenLightweightApplicationBuilder();
 
         // Act, Assert
-        await Should.ThrowAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
+        await Assert.ThrowsAnyAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var builder = GivenLightweightApplicationBuilder(mockAdminPath.Object, mockSetter.Object);
 
         // Act, Assert
-        await Should.ThrowAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
+        await Assert.ThrowsAnyAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
     }
 
     [Fact]
@@ -271,7 +271,7 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var builder = GivenLightweightApplicationBuilder(mockAdminPath.Object, mockSetter.Object);
 
         // Act, Assert
-        await Should.ThrowAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
+        await Assert.ThrowsAnyAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
     }
 
     [Fact]
@@ -289,8 +289,8 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var result = await builder.UseOcelot((app, config) => { });
 
         // Assert
-        result.ShouldNotBeNull();
-        result.ShouldBe(builder);
+        Assert.NotNull(result);
+        Assert.Same(builder, result);
     }
 
     [Fact]
@@ -310,7 +310,7 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         await builder.UseOcelot((app, config) => { });
 
         // Assert
-        delegateInvoked.ShouldBeTrue();
+        Assert.True(delegateInvoked);
     }
 
     [Fact]
@@ -328,7 +328,7 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         await builder.UseOcelot((app, config) => { });
 
         // Assert
-        invokedCount.ShouldBe(3);
+        Assert.Equal(3, invokedCount);
     }
 
     [Fact]
@@ -342,12 +342,12 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var result = await builder.UseOcelot((app, config) =>
         {
             actionInvoked = true;
-            config.ShouldNotBeNull();
+            Assert.NotNull(config);
         });
 
         // Assert
-        result.ShouldNotBeNull();
-        actionInvoked.ShouldBeTrue();
+        Assert.NotNull(result);
+        Assert.True(actionInvoked);
     }
 
     [Fact]
@@ -363,11 +363,11 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
         var builder = GivenLightweightApplicationBuilder();
 
         // Act
-        var exception = await Should.ThrowAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() => builder.UseOcelot((app, config) => { }));
 
         // Assert
-        exception.Message.ShouldContain("Unable to start Ocelot");
-        exception.Message.ShouldContain(errorMessage);
+        Assert.Contains("Unable to start Ocelot", exception.Message);
+        Assert.Contains(errorMessage, exception.Message);
     }
 
     private IApplicationBuilder GivenFullApplicationBuilder()
