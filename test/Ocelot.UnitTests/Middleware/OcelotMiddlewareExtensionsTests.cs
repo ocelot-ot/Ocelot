@@ -332,7 +332,7 @@ public class OcelotMiddlewareExtensionsTests : UnitTest
     }
 
     [Fact]
-    public async Task UseOcelot_WithBuilderActionOverloadNoConfig_DelegatesToFiveParamOverload()
+    public async Task UseOcelot_WithBuilderActionOverloadNoConfig_InvokesActionWithConfiguration()
     {
         // Arrange
         var builder = GivenLightweightApplicationBuilder();
