@@ -181,6 +181,37 @@ public class OcelotBuilder : IOcelotBuilder
             .AddNewtonsoftJson();
     }
 
+    public IOcelotBuilder AddConfigurationDelegate(OcelotMiddlewareConfigurationDelegate createConfiguration)
+    {
+        Services.AddSingleton(createConfiguration);
+        return this;
+    }
+
+    public IOcelotBuilder AddConfigurationPoller()
+    {
+        return AddConfigurationPoller<FileConfigurationPoller, InMemoryFileConfigurationPollerOptions, DiskFileConfigurationRepository>();
+    }
+
+    public IOcelotBuilder AddConfigurationDiscoveryPoller<TPoller, TPollerOptions, TRepository>()
+        where TPoller : class, IFileConfigurationPoller
+        where TPollerOptions : ServiceDiscoveryFileConfigurationPollerOptions
+        where TRepository : class, IFileConfigurationRepository
+    {
+        return AddConfigurationPoller<TPoller, TPollerOptions, TRepository>();
+    }
+
+    public IOcelotBuilder AddConfigurationPoller<TPoller, TPollerOptions, TRepository>()
+        where TPoller : class, IFileConfigurationPoller
+        where TPollerOptions : class, IFileConfigurationPollerOptions
+        where TRepository : class, IFileConfigurationRepository
+    {
+        Services
+            .RemoveAll<IFileConfigurationPoller>().AddHostedService<TPoller>()
+            .RemoveAll<IFileConfigurationPollerOptions>().AddSingleton<IFileConfigurationPollerOptions, TPollerOptions>()
+            .RemoveAll<IFileConfigurationRepository>().AddSingleton<IFileConfigurationRepository, TRepository>();
+        return this;
+    }
+
     public IOcelotBuilder AddSingletonDefinedAggregator<T>()
         where T : class, IDefinedAggregator
     {

@@ -1,7 +1,10 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Ocelot.Configuration;
+using Ocelot.Configuration.Repository;
 using Ocelot.LoadBalancer.Interfaces;
+using Ocelot.Middleware;
 using Ocelot.Multiplexer;
 using Ocelot.ServiceDiscovery.Providers;
 
@@ -14,6 +17,43 @@ public interface IOcelotBuilder
     IConfiguration Configuration { get; }
 
     IMvcCoreBuilder MvcCoreBuilder { get; }
+
+    /// <summary>
+    /// Adds a delegate to create or process configuration on Ocelot startup when calling the <see cref="OcelotMiddlewareExtensions.UseOcelot(IApplicationBuilder)"/> methods.
+    /// </summary>
+    /// <param name="createConfiguration">The delegate to be added.</param>
+    /// <returns>A reference to the same <see cref="IOcelotBuilder"/> object.</returns>
+    IOcelotBuilder AddConfigurationDelegate(OcelotMiddlewareConfigurationDelegate createConfiguration);
+
+    /// <summary>
+    /// Adds the default Configuration Poller feature using <see cref="FileConfigurationPoller"/>, <see cref="InMemoryFileConfigurationPollerOptions"/>, and <see cref="DiskFileConfigurationRepository"/>.
+    /// </summary>
+    /// <returns>A reference to the same <see cref="IOcelotBuilder"/> object.</returns>
+    IOcelotBuilder AddConfigurationPoller();
+
+    /// <summary>
+    /// Adds the Configuration Poller feature in service discovery mode.
+    /// </summary>
+    /// <typeparam name="TPoller">The polling service type.</typeparam>
+    /// <typeparam name="TPollerOptions">The poller options type (must extend <see cref="ServiceDiscoveryFileConfigurationPollerOptions"/>).</typeparam>
+    /// <typeparam name="TRepository">The repository service type.</typeparam>
+    /// <returns>A reference to the same <see cref="IOcelotBuilder"/> object.</returns>
+    IOcelotBuilder AddConfigurationDiscoveryPoller<TPoller, TPollerOptions, TRepository>()
+        where TPoller : class, IFileConfigurationPoller
+        where TPollerOptions : ServiceDiscoveryFileConfigurationPollerOptions
+        where TRepository : class, IFileConfigurationRepository;
+
+    /// <summary>
+    /// Adds the Configuration Poller feature with custom poller, options, and repository types.
+    /// </summary>
+    /// <typeparam name="TPoller">The polling service type.</typeparam>
+    /// <typeparam name="TPollerOptions">The poller options service type.</typeparam>
+    /// <typeparam name="TRepository">The repository service type.</typeparam>
+    /// <returns>A reference to the same <see cref="IOcelotBuilder"/> object.</returns>
+    IOcelotBuilder AddConfigurationPoller<TPoller, TPollerOptions, TRepository>()
+        where TPoller : class, IFileConfigurationPoller
+        where TPollerOptions : class, IFileConfigurationPollerOptions
+        where TRepository : class, IFileConfigurationRepository;
 
     /// <summary>
     /// Adds a <see cref="DelegatingHandler"/> of the <paramref name="delegateType"/> type as a transient service, with the <paramref name="global"/> option to make the handler globally available.
