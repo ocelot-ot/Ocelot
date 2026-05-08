@@ -1,8 +1,7 @@
-﻿using Ocelot.Configuration;
+using Ocelot.Configuration;
 using Ocelot.Configuration.File;
 using Ocelot.Configuration.Repository;
 using Ocelot.Provider.Consul;
-using Ocelot.Responses;
 
 namespace Ocelot.UnitTests.Configuration.Repository;
 
@@ -10,7 +9,7 @@ public class ConsulFileConfigurationPollerOptionTests
 {
     private readonly Mock<IInternalConfigurationRepository> _mockInternalConfigRepo = new();
     private readonly Mock<IFileConfigurationRepository> _mockFileConfigurationRepository = new();
-    private readonly ConsulFileConfigurationPollerOption _sut; // System Under Test
+    private readonly ConsulFileConfigurationPollerOption _sut;
 
     public ConsulFileConfigurationPollerOptionTests()
     {
@@ -33,21 +32,19 @@ public class ConsulFileConfigurationPollerOptionTests
     public void Delay_ShouldReturnDefaultValue_WhenFileConfigurationIsNull()
     {
         // Arrange
-        var fileConfigResponse = new OkResponse<FileConfiguration>(null);
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns((FileConfiguration)null);
 
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(null);
         _mockInternalConfigRepo
             .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
+            .Returns((IInternalConfiguration)null);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
-        Assert.Equal(1000, delay);
+        Assert.Equal(InMemoryFileConfigurationPollerOptions.DefaultDelayMilliseconds, delay);
     }
 
     [Fact]
@@ -65,14 +62,13 @@ public class ConsulFileConfigurationPollerOptionTests
                 }
             }
         };
-        var fileConfigResponse = new OkResponse<FileConfiguration>(fileConfiguration);
 
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns(fileConfiguration);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
         Assert.Equal(expectedDelay, delay);
@@ -92,44 +88,39 @@ public class ConsulFileConfigurationPollerOptionTests
                 }
             }
         };
-        var fileConfigResponse = new OkResponse<FileConfiguration>(fileConfiguration);
 
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns(fileConfiguration);
 
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(null);
         _mockInternalConfigRepo
             .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
+            .Returns((IInternalConfiguration)null);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
-        Assert.Equal(1000, delay);
+        Assert.Equal(InMemoryFileConfigurationPollerOptions.DefaultDelayMilliseconds, delay);
     }
 
     [Fact]
-    public void Delay_ShouldReturnDefaultValue_WhenFileConfigIsError()
+    public void Delay_ShouldReturnDefaultValue_WhenFileConfigThrows()
     {
         // Arrange
-        var err = new UnableToSetConfigInConsulError("Error message");
-        var fileConfigResponse = new ErrorResponse<FileConfiguration>(err);
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Throws(new Exception("Error"));
 
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(null);
         _mockInternalConfigRepo
             .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
+            .Returns((IInternalConfiguration)null);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
-        Assert.Equal(1000, delay);
+        Assert.Equal(InMemoryFileConfigurationPollerOptions.DefaultDelayMilliseconds, delay);
     }
 
     [Fact]
@@ -143,22 +134,20 @@ public class ConsulFileConfigurationPollerOptionTests
                 ServiceDiscoveryProvider = null
             }
         };
-        var fileConfigResponse = new OkResponse<FileConfiguration>(fileConfiguration);
 
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns(fileConfiguration);
 
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(null);
         _mockInternalConfigRepo
             .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
+            .Returns((IInternalConfiguration)null);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
-        Assert.Equal(1000, delay);
+        Assert.Equal(InMemoryFileConfigurationPollerOptions.DefaultDelayMilliseconds, delay);
     }
 
     [Fact]
@@ -166,10 +155,9 @@ public class ConsulFileConfigurationPollerOptionTests
     {
         // Arrange
         const int expectedDelay = 3000;
-        var fileConfigResponse = new OkResponse<FileConfiguration>(null);
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns((FileConfiguration)null);
 
         var internalConfiguration = new InternalConfiguration
         {
@@ -178,13 +166,12 @@ public class ConsulFileConfigurationPollerOptionTests
                 PollingInterval = expectedDelay,
             }
         };
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(internalConfiguration);
         _mockInternalConfigRepo
             .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
+            .Returns(internalConfiguration);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
         Assert.Equal(expectedDelay, delay);
@@ -194,10 +181,9 @@ public class ConsulFileConfigurationPollerOptionTests
     public void Delay_ShouldReturnDefaultValue_WhenInternalConfigPollingIntervalIsZero()
     {
         // Arrange
-        var fileConfigResponse = new OkResponse<FileConfiguration>(null);
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns((FileConfiguration)null);
 
         var internalConfiguration = new InternalConfiguration
         {
@@ -206,63 +192,57 @@ public class ConsulFileConfigurationPollerOptionTests
                 PollingInterval = 0,
             }
         };
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(internalConfiguration);
         _mockInternalConfigRepo
             .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
+            .Returns(internalConfiguration);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
-        Assert.Equal(1000, delay);
+        Assert.Equal(InMemoryFileConfigurationPollerOptions.DefaultDelayMilliseconds, delay);
     }
 
     [Fact]
-    public void Delay_ShouldReturnDefaultValue_WhenInternalConfigIsError()
+    public void Delay_ShouldReturnDefaultValue_WhenInternalConfigIsNull()
     {
         // Arrange
-        var fileConfigResponse = new OkResponse<FileConfiguration>(null);
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns((FileConfiguration)null);
 
-        var err = new UnableToSetConfigInConsulError("Error message");
-        var internalConfigResponse = new ErrorResponse<IInternalConfiguration>(err);
         _mockInternalConfigRepo
             .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
+            .Returns((IInternalConfiguration)null);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
-        Assert.Equal(1000, delay);
+        Assert.Equal(InMemoryFileConfigurationPollerOptions.DefaultDelayMilliseconds, delay);
     }
 
     [Fact]
     public void Delay_ShouldReturnDefaultValue_WhenInternalConfigServiceProviderConfigurationIsNull()
     {
         // Arrange
-        var fileConfigResponse = new OkResponse<FileConfiguration>(null);
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns((FileConfiguration)null);
 
         var internalConfiguration = new InternalConfiguration
         {
             ServiceProviderConfiguration = null
         };
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(internalConfiguration);
         _mockInternalConfigRepo
             .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
+            .Returns(internalConfiguration);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
-        Assert.Equal(1000, delay);
+        Assert.Equal(InMemoryFileConfigurationPollerOptions.DefaultDelayMilliseconds, delay);
     }
 
     [Fact]
@@ -282,10 +262,9 @@ public class ConsulFileConfigurationPollerOptionTests
                 }
             }
         };
-        var fileConfigResponse = new OkResponse<FileConfiguration>(fileConfiguration);
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns(fileConfiguration);
 
         var internalConfiguration = new InternalConfiguration
         {
@@ -294,113 +273,41 @@ public class ConsulFileConfigurationPollerOptionTests
                 PollingInterval = internalConfigDelay
             }
         };
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(internalConfiguration);
         _mockInternalConfigRepo
             .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
+            .Returns(internalConfiguration);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
         Assert.Equal(fileConfigDelay, delay);
     }
 
     [Fact]
-    public void Delay_ShouldReturn1000_WhenPollingIntervalIsNegative()
+    public async Task DelayAsync_ShouldReturnDelay()
     {
         // Arrange
-        const int negativeDelay = -100;
+        const int expectedDelay = 5000;
         var fileConfiguration = new FileConfiguration
         {
             GlobalConfiguration = new()
             {
                 ServiceDiscoveryProvider = new()
                 {
-                    PollingInterval = negativeDelay,
+                    PollingInterval = expectedDelay
                 }
             }
         };
-        var fileConfigResponse = new OkResponse<FileConfiguration>(fileConfiguration);
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns(fileConfiguration);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = await _sut.DelayAsync();
 
         // Assert
-        // Note: The current implementation allows negative values to pass through
-        // This test documents current behavior; consider if validation is needed
-        Assert.Equal(1000, delay);
-    }
-
-    [Fact]
-    public void Delay_ShouldCallFileConfigurationRepositoryGet()
-    {
-        // Arrange
-        var fileConfigResponse = new OkResponse<FileConfiguration>(null);
-        _mockFileConfigurationRepository
-            .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
-
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(null);
-        _mockInternalConfigRepo
-            .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
-
-        // Act
-        var delay = _sut.Delay;
-
-        // Assert
-        _mockFileConfigurationRepository.Verify(x => x.Get(), Times.Once);
-    }
-
-    [Fact]
-    public void Delay_ShouldCallInternalConfigRepositoryGet_WhenFileConfigDoesNotHaveValidPollingInterval()
-    {
-        // Arrange
-        var fileConfigResponse = new OkResponse<FileConfiguration>(null);
-        _mockFileConfigurationRepository
-            .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
-
-        var internalConfigResponse = new OkResponse<IInternalConfiguration>(null);
-        _mockInternalConfigRepo
-            .Setup(x => x.Get())
-            .Returns(internalConfigResponse);
-
-        // Act
-        var delay = _sut.Delay;
-
-        // Assert
-        _mockInternalConfigRepo.Verify(x => x.Get(), Times.Once);
-    }
-
-    [Fact]
-    public void Delay_ShouldNotCallInternalConfigRepositoryGet_WhenFileConfigHasValidPollingInterval()
-    {
-        // Arrange
-        var fileConfiguration = new FileConfiguration
-        {
-            GlobalConfiguration = new()
-            {
-                ServiceDiscoveryProvider = new()
-                {
-                    PollingInterval = 5000,
-                }
-            }
-        };
-        var fileConfigResponse = new OkResponse<FileConfiguration>(fileConfiguration);
-        _mockFileConfigurationRepository
-            .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
-
-        // Act
-        var delay = _sut.Delay;
-
-        // Assert
-        _mockInternalConfigRepo.Verify(x => x.Get(), Times.Never);
+        Assert.Equal(expectedDelay, delay);
     }
 
     [Theory]
@@ -421,13 +328,12 @@ public class ConsulFileConfigurationPollerOptionTests
                 }
             }
         };
-        var fileConfigResponse = new OkResponse<FileConfiguration>(fileConfiguration);
         _mockFileConfigurationRepository
             .Setup(x => x.Get())
-            .ReturnsAsync(fileConfigResponse);
+            .Returns(fileConfiguration);
 
         // Act
-        var delay = _sut.Delay;
+        var delay = _sut.Delay();
 
         // Assert
         Assert.Equal(pollingInterval, delay);

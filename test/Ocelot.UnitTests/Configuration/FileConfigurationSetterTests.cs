@@ -4,8 +4,8 @@ using Ocelot.Configuration.Creator;
 using Ocelot.Configuration.File;
 using Ocelot.Configuration.Repository;
 using Ocelot.Configuration.Setter;
-using Ocelot.Errors;
 using Ocelot.Responses;
+using Ocelot.UnitTests.Responder;
 
 namespace Ocelot.UnitTests.Configuration;
 
@@ -16,7 +16,6 @@ public class FileConfigurationSetterTests : UnitTest
     private readonly Mock<IInternalConfigurationRepository> _configRepo;
     private readonly Mock<IInternalConfigurationCreator> _configCreator;
     private Response<IInternalConfiguration> _configuration;
-    private object _result;
     private readonly Mock<IFileConfigurationRepository> _repo;
 
     public FileConfigurationSetterTests()
@@ -48,50 +47,46 @@ public class FileConfigurationSetterTests : UnitTest
             RateLimitOptions = new(),
             Timeout = 111,
         };
-        GivenTheRepoReturns(new OkResponse());
+        GivenTheRepoSucceeds();
         GivenTheCreatorReturns(new OkResponse<IInternalConfiguration>(config));
 
         // Act
-        _result = await _configSetter.Set(_fileConfiguration);
+        await _configSetter.SetAsync(_fileConfiguration);
 
         // Assert
         ThenTheConfigurationRepositoryIsCalledCorrectly();
     }
 
     [Fact]
-    public async Task Should_return_error_if_unable_to_set_file_configuration()
+    public async Task Should_throw_if_unable_to_set_ocelot_configuration()
     {
         // Arrange
         _fileConfiguration = new FileConfiguration();
-        GivenTheRepoReturns(new ErrorResponse(It.IsAny<Error>()));
+        GivenTheRepoSucceeds();
+        var error = new AnyError();
+        GivenTheCreatorReturns(new ErrorResponse<IInternalConfiguration>(error));
 
-        // Act
-        _result = await _configSetter.Set(_fileConfiguration);
-
-        // Assert
-        _result.ShouldBeOfType<ErrorResponse>();
+        // Act & Assert
+        await Assert.ThrowsAsync<ConfigurationRepositoryException>(() => _configSetter.SetAsync(_fileConfiguration));
     }
 
     [Fact]
-    public async Task Should_return_error_if_unable_to_set_ocelot_configuration()
+    public async Task Should_throw_if_repo_set_async_throws()
     {
         // Arrange
         _fileConfiguration = new FileConfiguration();
-        GivenTheRepoReturns(new OkResponse());
-        GivenTheCreatorReturns(new ErrorResponse<IInternalConfiguration>(It.IsAny<Error>()));
+        _repo.Setup(x => x.SetAsync(It.IsAny<FileConfiguration>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("Repo failure"));
 
-        // Act
-        _result = await _configSetter.Set(_fileConfiguration);
-
-        // Assert
-        _result.ShouldBeOfType<ErrorResponse>();
+        // Act & Assert
+        await Assert.ThrowsAsync<Exception>(() => _configSetter.SetAsync(_fileConfiguration));
     }
 
-    private void GivenTheRepoReturns(Response response)
+    private void GivenTheRepoSucceeds()
     {
         _repo
-            .Setup(x => x.Set(It.IsAny<FileConfiguration>()))
-            .ReturnsAsync(response);
+            .Setup(x => x.SetAsync(It.IsAny<FileConfiguration>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
     }
 
     private void GivenTheCreatorReturns(Response<IInternalConfiguration> configuration)

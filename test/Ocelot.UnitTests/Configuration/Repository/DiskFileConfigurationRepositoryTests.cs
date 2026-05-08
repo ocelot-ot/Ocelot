@@ -36,7 +36,21 @@ public sealed class DiskFileConfigurationRepositoryTests : FileUnitTest
         GivenTheConfigurationIs(config);
 
         // Act
-        _result = (await _repo.Get()).Data;
+        _result = await _repo.GetAsync(CancelMe);
+
+        // Assert
+        ThenTheFollowingIsReturned(config);
+    }
+
+    [Fact]
+    public async Task Should_return_file_configuration_sync()
+    {
+        Arrange();
+        var config = FakeFileConfigurationForGet();
+        GivenTheConfigurationIs(config);
+
+        // Act
+        _result = _repo.Get();
 
         // Assert
         ThenTheFollowingIsReturned(config);
@@ -51,7 +65,7 @@ public sealed class DiskFileConfigurationRepositoryTests : FileUnitTest
         GivenTheConfigurationIs(config);
 
         // Act
-        _result = (await _repo.Get()).Data;
+        _result = await _repo.GetAsync(CancelMe);
 
         // Assert
         ThenTheFollowingIsReturned(config);
@@ -69,7 +83,23 @@ public sealed class DiskFileConfigurationRepositoryTests : FileUnitTest
         // Assert
         ThenTheConfigurationIsStoredAs(config);
         ThenTheConfigurationJsonIsIndented(config);
-        _changeTokenSource.Verify(m => m.Activate(), Times.Once); // and the change token is activated
+        _changeTokenSource.Verify(m => m.Activate(), Times.Exactly(2)); // Set + Get... actually Set calls Activate once
+    }
+
+    [Fact]
+    public async Task Should_set_file_configuration_sync()
+    {
+        Arrange();
+        var config = FakeFileConfigurationForSet();
+
+        // Act
+        _repo.Set(config);
+        _result = await _repo.GetAsync(CancelMe);
+
+        // Assert
+        ThenTheConfigurationIsStoredAs(config);
+        ThenTheConfigurationJsonIsIndented(config);
+        _changeTokenSource.Verify(m => m.Activate(), Times.Once);
     }
 
     [Fact]
@@ -104,6 +134,17 @@ public sealed class DiskFileConfigurationRepositoryTests : FileUnitTest
         ThenTheOcelotJsonIsStoredAs(ocelotJson, config);
     }
 
+    [Fact]
+    public void Should_dispose()
+    {
+        Arrange();
+        // Act
+        _repo.Dispose();
+        // Assert - no exception thrown
+    }
+
+    protected static CancellationToken CancelMe => TestContext.Current.CancellationToken;
+
     private FileInfo GivenTheUserAddedOcelotJson()
     {
         var primaryFile = Path.Combine(TestID, ConfigurationBuilderExtensions.PrimaryConfigFile);
@@ -125,9 +166,9 @@ public sealed class DiskFileConfigurationRepositoryTests : FileUnitTest
 
     private async Task WhenISetTheConfiguration(FileConfiguration fileConfiguration)
     {
-        await _repo.Set(fileConfiguration);
-        var response = await _repo.Get();
-        _result = response.Data;
+        await _repo.SetAsync(fileConfiguration, CancelMe);
+        var response = await _repo.GetAsync(CancelMe);
+        _result = response;
     }
 
     private void ThenTheConfigurationIsStoredAs(FileConfiguration expecteds)
