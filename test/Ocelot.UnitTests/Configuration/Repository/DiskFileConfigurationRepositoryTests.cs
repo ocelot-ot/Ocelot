@@ -83,7 +83,7 @@ public sealed class DiskFileConfigurationRepositoryTests : FileUnitTest
         // Assert
         ThenTheConfigurationIsStoredAs(config);
         ThenTheConfigurationJsonIsIndented(config);
-        _changeTokenSource.Verify(m => m.Activate(), Times.Exactly(2)); // Set + Get... actually Set calls Activate once
+        _changeTokenSource.Verify(m => m.Activate(), Times.Once); // SetAsync calls Activate once
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public sealed class DiskFileConfigurationRepositoryTests : FileUnitTest
         // Assert - no exception thrown
     }
 
-    protected static CancellationToken CancelMe => TestContext.Current.CancellationToken;
+    private static CancellationToken CancelMe => TestContext.Current.CancellationToken;
 
     private FileInfo GivenTheUserAddedOcelotJson()
     {

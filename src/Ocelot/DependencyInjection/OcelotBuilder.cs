@@ -76,6 +76,7 @@ public class OcelotBuilder : IOcelotBuilder
         Services.TryAddSingleton<IBaseUrlFinder, BaseUrlFinder>();
         Services.TryAddSingleton<IFileConfigurationRepository, DiskFileConfigurationRepository>();
         Services.TryAddSingleton<IFileConfigurationSetter, FileAndInternalConfigurationSetter>();
+        Services.TryAddSingleton<IInternalConfigurationRepository, InMemoryInternalConfigurationRepository>();
         Services.TryAddSingleton<IServiceDiscoveryProviderFactory, ServiceDiscoveryProviderFactory>();
         Services.AddSingleton<ILoadBalancerCreator, NoLoadBalancerCreator>();
         Services.AddSingleton<ILoadBalancerCreator, RoundRobinCreator>();
