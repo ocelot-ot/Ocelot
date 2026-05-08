@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Ocelot.Cache;
 using Ocelot.Configuration;
@@ -6,8 +6,9 @@ using Ocelot.Configuration.File;
 using Ocelot.Configuration.Repository;
 using Ocelot.Logging;
 using Ocelot.Provider.Consul.Interfaces;
-using Ocelot.Responses;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Ocelot.Provider.Consul;
 
@@ -37,44 +38,59 @@ public class ConsulFileConfigurationRepository : IFileConfigurationRepository
         _consul = factory.Get(config);
     }
 
-    public async Task<Response<FileConfiguration>> Get()
+    public FileConfiguration Get()
     {
         var config = _cache.Get(_configurationKey, _configurationKey);
         if (config != null)
-        {
-            return new OkResponse<FileConfiguration>(config);
-        }
+            return config;
 
-        var queryResult = await _consul.KV.Get(_configurationKey);
+        var queryResult = _consul.KV.Get(_configurationKey).GetAwaiter().GetResult();
         if (queryResult.Response == null)
-        {
-            return new OkResponse<FileConfiguration>(null);
-        }
+            return null;
 
         var bytes = queryResult.Response.Value;
         var json = Encoding.UTF8.GetString(bytes);
-        var consulConfig = JsonConvert.DeserializeObject<FileConfiguration>(json);
-
-        return new OkResponse<FileConfiguration>(consulConfig);
+        return JsonConvert.DeserializeObject<FileConfiguration>(json);
     }
 
-    public async Task<Response> Set(FileConfiguration ocelotConfiguration)
+    public async Task<FileConfiguration> GetAsync(CancellationToken cancellationToken = default)
     {
-        var json = JsonConvert.SerializeObject(ocelotConfiguration, Formatting.Indented);
+        var config = _cache.Get(_configurationKey, _configurationKey);
+        if (config != null)
+            return config;
+
+        var queryResult = await _consul.KV.Get(_configurationKey);
+        if (queryResult.Response == null)
+            return null;
+
+        var bytes = queryResult.Response.Value;
+        var json = Encoding.UTF8.GetString(bytes);
+        return JsonConvert.DeserializeObject<FileConfiguration>(json);
+    }
+
+    public void Set(FileConfiguration configuration)
+    {
+        var json = JsonConvert.SerializeObject(configuration, Formatting.Indented);
         var bytes = Encoding.UTF8.GetBytes(json);
-        var kvPair = new KVPair(_configurationKey)
+        var kvPair = new KVPair(_configurationKey) { Value = bytes };
+
+        var result = _consul.KV.Put(kvPair).GetAwaiter().GetResult();
+        if (result.Response)
         {
-            Value = bytes,
-        };
+            _cache.AddOrUpdate(_configurationKey, configuration, _configurationKey, TimeSpan.FromSeconds(3));
+        }
+    }
+
+    public async Task SetAsync(FileConfiguration configuration, CancellationToken cancellationToken = default)
+    {
+        var json = JsonConvert.SerializeObject(configuration, Formatting.Indented);
+        var bytes = Encoding.UTF8.GetBytes(json);
+        var kvPair = new KVPair(_configurationKey) { Value = bytes };
 
         var result = await _consul.KV.Put(kvPair);
         if (result.Response)
         {
-            _cache.AddOrUpdate(_configurationKey, ocelotConfiguration, _configurationKey, TimeSpan.FromSeconds(3));
-            return new OkResponse();
+            _cache.AddOrUpdate(_configurationKey, configuration, _configurationKey, TimeSpan.FromSeconds(3));
         }
-
-        return new ErrorResponse(new UnableToSetConfigInConsulError(
-            $"Unable to set {nameof(FileConfiguration)} in {nameof(Consul)}, response status code from {nameof(Consul)} was {result.StatusCode}"));
     }
 }

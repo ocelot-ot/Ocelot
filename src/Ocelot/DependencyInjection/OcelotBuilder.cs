@@ -60,7 +60,6 @@ public class OcelotBuilder : IOcelotBuilder
         Services.TryAddSingleton<IHttpContextRequestHeaderReplacer, HttpContextRequestHeaderReplacer>();
         Services.TryAddSingleton<IHeaderFindAndReplaceCreator, HeaderFindAndReplaceCreator>();
         Services.TryAddSingleton<IInternalConfigurationCreator, FileInternalConfigurationCreator>();
-        Services.TryAddSingleton<IInternalConfigurationRepository, InMemoryInternalConfigurationRepository>();
         Services.TryAddSingleton<IRoutesCreator, StaticRoutesCreator>();
         Services.TryAddSingleton<IDynamicsCreator, DynamicRoutesCreator>();
         Services.TryAddSingleton<IAggregatesCreator, AggregatesCreator>();

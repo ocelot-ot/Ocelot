@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -7,7 +7,6 @@ using Ocelot.Configuration;
 using Ocelot.Configuration.Creator;
 using Ocelot.Configuration.File;
 using Ocelot.Configuration.Repository;
-using Ocelot.Configuration.Setter;
 using Ocelot.Infrastructure.Extensions;
 using Ocelot.Logging;
 using Ocelot.Responses;
@@ -59,12 +58,6 @@ public static class OcelotMiddlewareExtensions
     {
         builder.BuildOcelotPipeline(pipelineConfiguration);
 
-        /*
-        inject first delegate into first piece of asp.net middleware..maybe not like this
-        then because we are updating the http context in ocelot it comes out correct for
-        rest of asp.net..
-        */
-
         builder.Properties["analysis.NextMiddlewareName"] = "TransitionToOcelotMiddleware";
 
         return builder;
@@ -73,7 +66,6 @@ public static class OcelotMiddlewareExtensions
     private static async Task<IInternalConfiguration> CreateConfiguration(IApplicationBuilder builder)
     {
         // make configuration from file system?
-        // earlier user needed to add ocelot files in startup configuration stuff, asp.net will map it to this
         var fileConfig = builder.ApplicationServices.GetService<IOptionsMonitor<FileConfiguration>>();
 
         // now create the config
@@ -100,54 +92,32 @@ public static class OcelotMiddlewareExtensions
 
         var configurations = builder.ApplicationServices.GetServices<OcelotMiddlewareConfigurationDelegate>();
 
-        // Todo - this has just been added for consul so far...will there be an ordering problem in the future? Should refactor all config into this pattern?
-        foreach (var configuration in configurations)
+        foreach (var conf in configurations)
         {
-            await configuration(builder);
+            await conf(builder);
         }
 
-        if (AdministrationApiInUse(adminPath))
+        if (adminPath != null) // Administration API is in use
         {
-            //We have to make sure the file config is set for the ocelot.env.json and ocelot.json so that if we pull it from the
-            //admin api it works...boy this is getting a spit spags boll.
             var fileConfigSetter = builder.ApplicationServices.GetService<IFileConfigurationSetter>();
 
-            await SetFileConfig(fileConfigSetter, fileConfig);
+            // Internally throws ConfigurationRepositoryException to stop Ocelot starting
+            await fileConfigSetter.SetAsync(fileConfig.CurrentValue, CancellationToken.None);
         }
 
         return GetOcelotConfigAndReturn(internalConfigRepo);
-    }
-
-    private static bool AdministrationApiInUse(IAdministrationPath adminPath)
-    {
-        return adminPath != null;
-    }
-
-    private static async Task SetFileConfig(IFileConfigurationSetter fileConfigSetter, IOptionsMonitor<FileConfiguration> fileConfig)
-    {
-        var response = await fileConfigSetter.Set(fileConfig.CurrentValue);
-
-        if (IsError(response))
-        {
-            ThrowToStopOcelotStarting(response);
-        }
-    }
-
-    private static bool IsError(Response response)
-    {
-        return response == null || response.IsError;
     }
 
     private static IInternalConfiguration GetOcelotConfigAndReturn(IInternalConfigurationRepository provider)
     {
         var ocelotConfiguration = provider.Get();
 
-        if (ocelotConfiguration?.Data == null || ocelotConfiguration.IsError)
+        if (ocelotConfiguration == null)
         {
-            ThrowToStopOcelotStarting(ocelotConfiguration);
+            throw new Exception("Unable to start Ocelot, configuration returned null");
         }
 
-        return ocelotConfiguration.Data;
+        return ocelotConfiguration;
     }
 
     private static void ThrowToStopOcelotStarting(Response config)

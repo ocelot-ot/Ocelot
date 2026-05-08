@@ -1,4 +1,6 @@
-﻿namespace Ocelot.Configuration.Repository;
+using Ocelot.Configuration.File;
+
+namespace Ocelot.Configuration.Repository;
 
 public class ConsulFileConfigurationPollerOption : IFileConfigurationPollerOptions
 {
@@ -12,27 +14,37 @@ public class ConsulFileConfigurationPollerOption : IFileConfigurationPollerOptio
         _fileConfigurationRepository = fileConfigurationRepository;
     }
 
-    public int Delay => GetDelay();
+    public int Delay() => GetDelay();
+
+    public Task<int> DelayAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(GetDelay());
 
     private int GetDelay()
     {
-        var delay = 1000;
+        var delay = InMemoryFileConfigurationPollerOptions.DefaultDelayMilliseconds;
 
-        var fileConfig = _fileConfigurationRepository.Get().GetAwaiter().GetResult(); // sync call, so TODO extend IFileConfigurationPollerOptions interface with 2nd async method
-        if (fileConfig?.Data?.GlobalConfiguration?.ServiceDiscoveryProvider != null &&
-                !fileConfig.IsError &&
-                fileConfig.Data.GlobalConfiguration.ServiceDiscoveryProvider.PollingInterval > 0)
+        FileConfiguration fileConfig;
+        try
         {
-            delay = fileConfig.Data.GlobalConfiguration.ServiceDiscoveryProvider.PollingInterval;
+            fileConfig = _fileConfigurationRepository.Get();
+        }
+        catch
+        {
+            fileConfig = null;
+        }
+
+        if (fileConfig?.GlobalConfiguration?.ServiceDiscoveryProvider != null &&
+                fileConfig.GlobalConfiguration.ServiceDiscoveryProvider.PollingInterval > 0)
+        {
+            delay = fileConfig.GlobalConfiguration.ServiceDiscoveryProvider.PollingInterval;
         }
         else
         {
             var internalConfig = _internalConfigRepo.Get();
-            if (internalConfig?.Data?.ServiceProviderConfiguration != null &&
-            !internalConfig.IsError &&
-            internalConfig.Data.ServiceProviderConfiguration.PollingInterval > 0)
+            if (internalConfig?.ServiceProviderConfiguration != null &&
+                internalConfig.ServiceProviderConfiguration.PollingInterval > 0)
             {
-                delay = internalConfig.Data.ServiceProviderConfiguration.PollingInterval;
+                delay = internalConfig.ServiceProviderConfiguration.PollingInterval;
             }
         }
 

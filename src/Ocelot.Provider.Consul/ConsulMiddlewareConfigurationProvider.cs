@@ -1,12 +1,10 @@
-﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Ocelot.Configuration.Creator;
 using Ocelot.Configuration.File;
 using Ocelot.Configuration.Repository;
-using Ocelot.Infrastructure.Extensions;
 using Ocelot.Middleware;
-using Ocelot.Responses;
 
 namespace Ocelot.Provider.Consul;
 
@@ -35,47 +33,31 @@ public static class ConsulMiddlewareConfigurationProvider
         IInternalConfigurationCreator internalConfigCreator, IInternalConfigurationRepository internalConfigRepo)
     {
         // Get the config from Consul
-        var fileConfigFromConsul = await fileConfigRepo.Get();
-        if (IsError(fileConfigFromConsul))
+        FileConfiguration fileConfigFromConsul;
+        try
         {
-            ThrowToStopOcelotStarting(fileConfigFromConsul);
+            fileConfigFromConsul = await fileConfigRepo.GetAsync();
         }
-        else if (ConfigNotStoredInConsul(fileConfigFromConsul))
+        catch (Exception ex)
         {
-            // there was no config in Consul set the file in config in Consul
-            await fileConfigRepo.Set(fileConfig.CurrentValue);
+            throw new Exception($"Unable to start Ocelot, error getting config from Consul: {ex.Message}", ex);
+        }
+
+        if (fileConfigFromConsul == null)
+        {
+            // there was no config in Consul - set the file config in Consul
+            await fileConfigRepo.SetAsync(fileConfig.CurrentValue);
         }
         else
         {
             // Create the internal config from Consul data
-            var internalConfig = await internalConfigCreator.Create(fileConfigFromConsul.Data);
-            if (IsError(internalConfig))
+            var internalConfig = await internalConfigCreator.Create(fileConfigFromConsul);
+            if (internalConfig.IsError)
             {
-                ThrowToStopOcelotStarting(internalConfig);
-            }
-            else
-            {
-                // add the internal config to the internal repo
-                var response = internalConfigRepo.AddOrReplace(internalConfig.Data);
-                if (IsError(response))
-                {
-                    ThrowToStopOcelotStarting(response);
-                }
+                throw new Exception($"Unable to start Ocelot, errors are:{string.Join(',', internalConfig.Errors.Select(x => x.Message))}");
             }
 
-            if (IsError(internalConfig))
-            {
-                ThrowToStopOcelotStarting(internalConfig);
-            }
+            internalConfigRepo.AddOrReplace(internalConfig.Data);
         }
     }
-
-    private static void ThrowToStopOcelotStarting(Response config)
-        => throw new Exception($"Unable to start Ocelot, errors are:{config.Errors.ToErrorString(true, true)}");
-
-    private static bool IsError(Response response)
-        => response == null || response.IsError;
-
-    private static bool ConfigNotStoredInConsul(Response<FileConfiguration> fileConfigFromConsul)
-        => fileConfigFromConsul.Data == null;
 }
