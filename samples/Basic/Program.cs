@@ -27,6 +27,7 @@ app.Use(async (context, next) =>
 {
     if (context.Request.Path == "/" && context.Request.Method == "GET")
     {
+        context.Response.StatusCode = StatusCodes.Status200OK;
         context.Response.ContentType = "text/html; charset=utf-8";
         await context.Response.WriteAsync(GetWelcomeHtml());
     }
