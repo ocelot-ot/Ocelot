@@ -264,20 +264,22 @@
         .action-button:active {
             transform: scale(0.98);
         }
-            background: #1e1e1e;
-            color: #d4d4d4;
+        .logging-window {
+            background: #f5f5f5;
+            color: #333;
             padding: 15px;
             border-radius: 5px;
             margin-top: 20px;
             font-family: 'Courier New', monospace;
             font-size: 0.85em;
-            max-height: 300px;
+            max-height: calc(100vh - 400px);
             overflow-y: auto;
             line-height: 1.4;
+            border: 1px solid #e0e0e0;
         }
         .log-entry {
             padding: 4px 0;
-            border-bottom: 1px solid #333;
+            border-bottom: 1px solid #e0e0e0;
         }
         .log-entry:last-child {
             border-bottom: none;
@@ -287,7 +289,7 @@
             margin-right: 8px;
         }
         .log-info {
-            color: #87ceeb;
+            color: #667eea;
         }
         .log-success {
             color: #4caf50;
@@ -487,7 +489,7 @@
                 case 'corruption':
                     statusIndicator.textContent = '';
                     statusIndicator.className = 'status-indicator corruption';
-                    statusText.textContent = 'Data corruption';
+                    statusText.textContent = 'Corruption';
                     statusText.className = 'route-status corruption';
                     break;
                 case 'not-tested':
@@ -534,11 +536,22 @@
                 return;
             }
 
-            // Start the test
+            // Start the test - reset status to running
             log(`Starting test for route: ${route.path}`, 'info');
             state.testing = true;
-            state.result = 'not-tested';
-            updateButtonState(routeKey, true);
+            state.result = 'testing';
+            
+            // Update status display to show running state
+            const statusIndicator = document.getElementById(routes[routeKey].statusId);
+            const statusText = document.getElementById(routes[routeKey].statusTextId);
+            statusIndicator.textContent = '';
+            statusIndicator.className = 'status-indicator testing';
+            statusText.textContent = 'Running';
+            statusText.className = 'route-status';
+            
+            const button = document.getElementById(routes[routeKey].buttonId);
+            button.textContent = 'Stop';
+            button.classList.add('stop');
 
             const keepSession = document.getElementById(`keep-session-${routeKey}`).checked;
             if (keepSession) {
