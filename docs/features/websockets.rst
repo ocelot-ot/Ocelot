@@ -191,13 +191,27 @@ The custom middleware type is then registered through ``OcelotPipelineConfigurat
 
   var wsPipeline = new OcelotPipelineConfiguration
   {
-      WebSocketsMiddlewareType = typeof(MyWebSocketsProxyMiddleware), // prioritized
-      WebSocketsMiddleware = CustomWebSocketsProxyMiddleware, // ignored in favor of WebSocketsMiddlewareType
+      WebSocketsMiddlewareType = typeof(MyWebSocketsProxyMiddleware),
+  };
+  await app.UseOcelot(wsPipeline);
+
+Alternatively, the same can be achieved with a delegate via ``WebSocketsMiddleware``:
+
+.. code-block:: csharp
+
+  var wsPipeline = new OcelotPipelineConfiguration
+  {
+      WebSocketsMiddleware = (context, next) =>
+      {
+          Task Next(HttpContext ctx) => next();
+          var loggerFactory = context.RequestServices.GetRequiredService<IOcelotLoggerFactory>();
+          var factory = context.RequestServices.GetRequiredService<IWebSocketsFactory>();
+          return new MyWebSocketsProxyMiddleware(Next, loggerFactory, factory).Invoke(context);
+      },
   };
   await app.UseOcelot(wsPipeline);
 
 When ``WebSocketsMiddlewareType`` is set, it takes **priority** over ``WebSocketsMiddleware`` and the delegate is ignored.
-When only ``WebSocketsMiddleware`` is set, it is used as a delegate to execute the custom middleware.
 For the full reference, see the :ref:`mi-ocelotpipelineconfiguration-class` section in :doc:`../features/middlewareinjection`.
 
   **Note**: Starting from Ocelot version ``25.0``, ``app.UseWebSockets()`` is called internally during Ocelot pipeline setup.
