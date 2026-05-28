@@ -78,6 +78,15 @@ The user can set middleware-functions aka custom user's middleware against the f
         | Prev: ``ClaimsToHeadersMiddleware``
         | Next: ``ClaimsToQueryStringMiddleware``
       - This allows the user to implement own query string manipulation logic.
+    * - | ``WebSocketsMiddleware``
+        | *WebSockets branch only*
+      - This allows the user to completely override Ocelot's `WebSocketsProxyMiddleware <https://github.com/ThreeMammals/Ocelot/blob/main/src/Ocelot/WebSockets/WebSocketsProxyMiddleware.cs>`_ for *WebSockets* requests. :sup:`1`
+        This delegate is ignored when ``WebSocketsMiddlewareType`` is also set.
+    * - | ``WebSocketsMiddlewareType``
+        | *WebSockets branch only*
+      - This allows the user to specify a ``Type`` derived from ``WebSocketsProxyMiddleware`` to use as the custom *WebSockets* proxy middleware. :sup:`1`
+        This option takes **priority** over ``WebSocketsMiddleware`` when both properties are set.
+        Useful for customizing behaviors such as the buffer size; see the :ref:`ws-sample` section in :doc:`../features/websockets`.
 
 Obviously, you can add the mentioned Ocelot middleware overrides as normal before the call to ``app.UseOcelot``.
 They cannot be added afterward because Ocelot does not invoke subsequent middleware overrides based on the specified middleware configuration.

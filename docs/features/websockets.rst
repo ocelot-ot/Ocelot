@@ -15,7 +15,7 @@ To enable *WebSockets* proxying with Ocelot, you need to do the following in you
   :emphasize-lines: 2
 
   var app = builder.Build();
-  app.UseWebSockets();
+  app.UseWebSockets(); // required for Ocelot 24.x and earlier; called automatically since version 25.0
   await app.UseOcelot();
   await app.RunAsync();
 
@@ -153,7 +153,7 @@ Below is a list of features that will not work:
 3. :doc:`../features/aggregation`
 4. :doc:`../features/ratelimiting`
 5. :doc:`../features/qualityofservice`
-6. :doc:`../features/middlewareinjection`
+6. :doc:`../features/middlewareinjection` (except the :ref:`mi-ocelotpipelineconfiguration-class` ``WebSocketsMiddlewareType`` and ``WebSocketsMiddleware`` properties, see :ref:`ws-sample`)
 7. :doc:`../features/headerstransformation`
 8. :doc:`../features/delegatinghandlers`
 9. :doc:`../features/claimstransformation`
@@ -162,6 +162,46 @@ Below is a list of features that will not work:
 12. :doc:`../features/authorization`
 
 We cannot be entirely sure how this feature will behave once it is widely used. Therefore, thorough testing is strongly recommended!
+
+.. _ws-sample:
+
+Sample
+------
+
+  | **Project**: `samples <https://github.com/ThreeMammals/Ocelot/tree/main/samples>`_ / `WebSocket <https://github.com/ThreeMammals/Ocelot/tree/main/samples/WebSocket>`_
+  | **Solution**: `Ocelot.Samples.sln <https://github.com/ThreeMammals/Ocelot/blob/main/samples/Ocelot.Samples.sln>`_
+
+The ``Ocelot.Samples.WebSocket.csproj`` sample project demonstrates how to proxy *WebSocket* connections with a customized buffer size
+by subclassing `WebSocketsProxyMiddleware <https://github.com/ThreeMammals/Ocelot/blob/main/src/Ocelot/WebSockets/WebSocketsProxyMiddleware.cs>`_
+and registering it via ``OcelotPipelineConfiguration``:
+
+.. code-block:: csharp
+
+  public class MyWebSocketsProxyMiddleware : WebSocketsProxyMiddleware
+  {
+      protected override int BufferSize => 65536; // 64 KB for high-throughput streams (e.g. HTTP.sys video streaming)
+  
+      public MyWebSocketsProxyMiddleware(RequestDelegate next, IOcelotLoggerFactory logging, IWebSocketsFactory factory)
+          : base(next, logging, factory) { }
+  }
+
+The custom middleware type is then registered through ``OcelotPipelineConfiguration.WebSocketsMiddlewareType``:
+
+.. code-block:: csharp
+
+  var wsPipeline = new OcelotPipelineConfiguration
+  {
+      WebSocketsMiddlewareType = typeof(MyWebSocketsProxyMiddleware), // prioritized
+      WebSocketsMiddleware = CustomWebSocketsProxyMiddleware, // ignored in favor of WebSocketsMiddlewareType
+  };
+  await app.UseOcelot(wsPipeline);
+
+When ``WebSocketsMiddlewareType`` is set, it takes **priority** over ``WebSocketsMiddleware`` and the delegate is ignored.
+When only ``WebSocketsMiddleware`` is set, it is used as a delegate to execute the custom middleware.
+For the full reference, see the :ref:`mi-ocelotpipelineconfiguration-class` section in :doc:`../features/middlewareinjection`.
+
+  **Note**: Starting from Ocelot version ``25.0``, ``app.UseWebSockets()`` is called internally during Ocelot pipeline setup.
+  You no longer need to call it explicitly before ``await app.UseOcelot()``.
 
 Roadmap
 -------
