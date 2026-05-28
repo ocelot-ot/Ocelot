@@ -153,7 +153,7 @@ Below is a list of features that will not work:
 3. :doc:`../features/aggregation`
 4. :doc:`../features/ratelimiting`
 5. :doc:`../features/qualityofservice`
-6. :doc:`../features/middlewareinjection` (except the :ref:`mi-ocelotpipelineconfiguration-class` ``WebSocketsMiddlewareType`` and ``WebSocketsMiddleware`` properties, see :ref:`ws-sample`)
+6. :doc:`../features/middlewareinjection` (except the :ref:`mi-ocelotpipelineconfiguration-class` ``WebSocketsMiddlewareType`` and ``WebSocketsMiddleware`` properties, see :ref:`Sample <ws-sample>`)
 7. :doc:`../features/headerstransformation`
 8. :doc:`../features/delegatinghandlers`
 9. :doc:`../features/claimstransformation`
@@ -165,11 +165,11 @@ We cannot be entirely sure how this feature will behave once it is widely used. 
 
 .. _ws-sample:
 
-Sample
-------
+Sample [#f5]_
+-------------
 
   | **Project**: `samples <https://github.com/ThreeMammals/Ocelot/tree/main/samples>`_ / `WebSocket <https://github.com/ThreeMammals/Ocelot/tree/main/samples/WebSocket>`_
-  | **Solution**: `Ocelot.Samples.sln <https://github.com/ThreeMammals/Ocelot/blob/main/samples/Ocelot.Samples.sln>`_
+  | **Solution**: `Ocelot.Samples.slnx <https://github.com/ThreeMammals/Ocelot/blob/main/Ocelot.Samples.slnx>`_
 
 The ``Ocelot.Samples.WebSocket.csproj`` sample project demonstrates how to proxy *WebSocket* connections with a customized buffer size
 by subclassing `WebSocketsProxyMiddleware <https://github.com/ThreeMammals/Ocelot/blob/main/src/Ocelot/WebSockets/WebSocketsProxyMiddleware.cs>`_
@@ -185,7 +185,7 @@ and registering it via ``OcelotPipelineConfiguration``:
           : base(next, logging, factory) { }
   }
 
-The custom middleware type is then registered through ``OcelotPipelineConfiguration.WebSocketsMiddlewareType``:
+The custom middleware type is then registered through ``WebSocketsMiddlewareType`` option of the :ref:`mi-ocelotpipelineconfiguration-class`:
 
 .. code-block:: csharp
 
@@ -205,16 +205,18 @@ Alternatively, the same can be achieved with a delegate via ``WebSocketsMiddlewa
       {
           Task Next(HttpContext ctx) => next();
           var loggerFactory = context.RequestServices.GetRequiredService<IOcelotLoggerFactory>();
-          var factory = context.RequestServices.GetRequiredService<IWebSocketsFactory>();
-          return new MyWebSocketsProxyMiddleware(Next, loggerFactory, factory).Invoke(context);
+          var wsFactory = context.RequestServices.GetRequiredService<IWebSocketsFactory>();
+          var middleware = new MyWebSocketsProxyMiddleware(Next, loggerFactory, wsFactory);
+          return middleware.Invoke(context);
       },
   };
   await app.UseOcelot(wsPipeline);
 
 When ``WebSocketsMiddlewareType`` is set, it takes **priority** over ``WebSocketsMiddleware`` and the delegate is ignored.
-For the full reference, see the :ref:`mi-ocelotpipelineconfiguration-class` section in :doc:`../features/middlewareinjection`.
+For the full reference, see the :ref:`mi-ocelotpipelineconfiguration-class` section in :doc:`../features/middlewareinjection` chapter.
 
-  **Note**: Starting from Ocelot version ``25.0``, ``app.UseWebSockets()`` is called internally during Ocelot pipeline setup.
+.. note::
+  Starting from Ocelot version `25.0`_, ``app.UseWebSockets()`` is called internally during Ocelot pipeline setup.
   You no longer need to call it explicitly before ``await app.UseOcelot()``.
 
 Roadmap
@@ -243,6 +245,7 @@ Additionally, we welcome any bug reports, enhancement suggestions, or proposals 
   This "life hack" for self-signed SSL certificates is available starting from version `20.0`_.
   However, it will be either removed or reworked in future releases. For further details, refer to the :ref:`ssl-errors` section.
 .. [#f4] If requested, we might explore options for implementing basic authentication.
+.. [#f5] The :ref:`Sample <ws-sample>` was introduced for issue `2386`_ and implemented in pull request `2387`_, as part of version `25.0`_.
 
 .. _Program: https://github.com/ThreeMammals/Ocelot/blob/main/samples/Basic/Program.cs
 .. _ocelot.json: https://github.com/ThreeMammals/Ocelot/blob/main/samples/Basic/ocelot.json
@@ -253,9 +256,12 @@ Additionally, we welcome any bug reports, enhancement suggestions, or proposals 
 .. _1375: https://github.com/ThreeMammals/Ocelot/issues/1375
 .. _1377: https://github.com/ThreeMammals/Ocelot/pull/1377
 .. _1707: https://github.com/ThreeMammals/Ocelot/issues/1707
+.. _2386: https://github.com/ThreeMammals/Ocelot/issues/2386
+.. _2387: https://github.com/ThreeMammals/Ocelot/pull/2387
 .. _5.3.0: https://github.com/ThreeMammals/Ocelot/releases/tag/5.3.0
 .. _8.0.7: https://github.com/ThreeMammals/Ocelot/releases/tag/8.0.7
 .. _20.0: https://github.com/ThreeMammals/Ocelot/releases/tag/20.0.0
+.. _25.0: https://github.com/ThreeMammals/Ocelot/releases/tag/25.0.0
 
 .. |octocat| image:: https://github.githubassets.com/images/icons/emoji/octocat.png
   :alt: octocat
