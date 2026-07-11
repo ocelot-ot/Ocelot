@@ -157,7 +157,7 @@ jobs:
   # Matrix build job having 2 dimensions (os, ver)
   build:
     strategy:
-      max-parallel: 3
+      max-parallel: 1
       matrix:
         os: [ubuntu, macos, windows]
         framework: [net10]
