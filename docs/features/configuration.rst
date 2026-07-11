@@ -1,11 +1,15 @@
 .. _ocelot.json: https://github.com/ThreeMammals/Ocelot/blob/main/samples/Basic/ocelot.json
 .. _Program: https://github.com/ThreeMammals/Ocelot/blob/main/samples/Configuration/Program.cs
 .. _ConfigurationBuilderExtensions: https://github.com/ThreeMammals/Ocelot/blob/main/src/Ocelot/DependencyInjection/ConfigurationBuilderExtensions.cs
+.. _ConfigurationExtensions: https://github.com/ThreeMammals/Ocelot/blob/main/src/Ocelot/DependencyInjection/ConfigurationExtensions.cs
 .. _Consul: https://www.consul.io/
 .. _KV Store: https://developer.hashicorp.com/consul/docs/dynamic-app-config/kv
 
 Configuration
 =============
+.. contents:: Table of Contents
+   :depth: 2
+   :local:
 
 An example configuration can be found here in `ocelot.json`_.
 There are two major sections to the configuration: an array of ``Routes`` and a ``GlobalConfiguration`` sections:
@@ -389,6 +393,52 @@ This feature proves exceptionally valuable in cloud environments like Azure, AWS
 Furthermore, within Docker container environments, permissions can be scarce, necessitating substantial DevOps efforts to enable file write operations.
 Therefore, save time by leveraging this feature!
 
+.. _config-merging-recipes:
+
+Post merging recipes
+^^^^^^^^^^^^^^^^^^^^^
+
+  **Sample**: `Ocelot.Samples.Configuration <https://github.com/ThreeMammals/Ocelot/blob/main/samples/Configuration/>`_
+
+Once the ``ocelot.*.json`` files have been merged, either to the `ocelot.json`_ file on disk or in memory (see :ref:`config-merging-tomemory`), Ocelot exposes two families of extension methods that let you inspect the resulting configuration directly from your `Program`_.cs file:
+
+* The ``Ocelot*`` extension methods of the ``IConfiguration`` interface, declared in the `ConfigurationExtensions`_ class, which navigate the ASP.NET ``IConfiguration``/``IConfigurationSection`` tree.
+* The ``OcelotJ*`` extension methods of the ``IConfigurationBuilder`` interface, declared in the `ConfigurationBuilderExtensions`_ class, which operate on the merged configuration as Newtonsoft's ``JObject``/``JToken`` graph.
+
+  **Note**: The ``builder.Configuration`` property (of type ``ConfigurationManager``) implements both the ``IConfiguration`` and ``IConfigurationBuilder`` interfaces.
+  Therefore, all the helpers below can be invoked on that very same ``configuration`` variable, regardless of which interface declares them.
+
+Below are a few general-purpose recipes.
+For recipes dedicated to reading custom, non-schema properties, which is the primary scenario this merging feature was designed to support, see the :ref:`config-custom-properties` section.
+
+**Reading well-known sections via** ``IConfiguration``:
+
+.. code-block:: csharp
+
+  var configuration = builder.Configuration;
+  var ocRoot = configuration.OcelotRoot(); // IConfigurationRoot of the merged configuration
+  var ocRoutes = configuration.OcelotRoutes(); // "Routes" section
+  var ocGlobal = configuration.OcelotGlobalConfiguration(); // "GlobalConfiguration" section
+  var baseUrl = configuration.OcelotGlobalProperty<string>(nameof(FileGlobalConfiguration.BaseUrl));
+
+**Finding a route by** ``UpstreamPathTemplate`` **or** ``Key``:
+
+.. code-block:: csharp
+
+  var routeWeather = configuration.OcelotRoute("/weather/current/{city}"); // by UpstreamPathTemplate, case sensitive
+  var routePosts = configuration.OcelotRoute(key: "R3"); // by Key, case sensitive
+
+**Reading the merged JSON via** ``IConfigurationBuilder`` **using Newtonsoft's** ``JObject``/``JToken``:
+
+.. code-block:: csharp
+
+  string otJson = configuration.OcelotJson(); // JSON text of the merged ocelot.json
+  JObject jRoot = configuration.OcelotJObject(); // same as JObject.Parse(otJson)
+  JArray jRoutes = configuration.OcelotJRoutes();
+  JObject jWeather = configuration.OcelotJRoute("/weather/current/{city}"); // case insensitive by default
+
+Browse the full `Program`_.cs file of the `Ocelot.Samples.Configuration <https://github.com/ThreeMammals/Ocelot/blob/main/samples/Configuration/>`_ sample app, described in the :ref:`config-sample` section, for more end-to-end recipes.
+
 Reload On Change
 ----------------
 
@@ -752,6 +802,127 @@ You can utilize these methods in the `Program`_.cs file of your gateway app to c
 
 Find additional details in the dedicated :ref:`di-configuration-overview` section and in subsequent sections related to the :doc:`../features/dependencyinjection` chapter.
 
+.. _config-custom-properties:
+
+Extend with Custom Properties [#f6]_
+-------------------------------------
+
+  **Sample**: `Ocelot.Samples.Configuration <https://github.com/ThreeMammals/Ocelot/blob/main/samples/Configuration/>`_
+
+Ocelot does not restrict any ``ocelot.*.json`` configuration file to the well-known :ref:`config-route-schema`, :ref:`config-dynamic-route-schema`, :ref:`config-aggregate-route-schema` or :ref:`config-global-configuration-schema` properties.
+You are free to add your own, arbitrary, non-schema JSON properties at the route or ``GlobalConfiguration`` level, next to the standard ones, without declaring them anywhere in advance.
+
+As explained in the :ref:`config-merging-files` section, when several ``ocelot.*.json`` files are merged together, their sections (``Routes``, ``DynamicRoutes``, ``Aggregates``, ``GlobalConfiguration``) are merged by Newtonsoft's ``JToken`` merge functionality rather than one file simply overwriting another.
+This means custom properties declared in different files, for example environment-specific defaults kept in ``ocelot.global.json`` and route-specific overrides kept in a dedicated ``ocelot.<name>.json`` file, are combined into a single object rather than lost during merging.
+
+Defining custom properties
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Custom properties can be simple values, arrays, or nested objects. They live alongside the well-known schema properties:
+
+.. code-block:: json
+  :emphasize-lines: 6-7, 12-17
+
+  {
+    "Routes": [
+      {
+        "UpstreamPathTemplate": "/weather/current/{city}",
+        // other route properties...
+        "DefaultCity": "Paris", // custom property
+        "DefaultCountry": "France" // custom property
+      }
+    ],
+    "GlobalConfiguration": {
+      // other global properties...
+      "DefaultCountry": "England", // custom property
+      "DefaultCities": [ "Dublin", "London", "Edinburgh" ], // custom array
+      "Defaults": { // custom options object
+        "Country": "UK",
+        "City": "London",
+        "HighTemp": 30
+      }
+    }
+  }
+
+Reading custom properties via ``IConfiguration``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The `ConfigurationExtensions`_ class adds several ``Ocelot*`` helper methods to the ``IConfiguration`` interface, so custom properties can be read directly from the merged configuration without defining your own C# model for them:
+
+.. code-block:: csharp
+  :emphasize-lines: 3,4,7,8
+
+  var configuration = builder.Configuration;
+  static string GlobalPath(string name) => $"{nameof(FileConfiguration.GlobalConfiguration)}:{name}";
+  string defaultCountry = configuration[GlobalPath("DefaultCountry")]; // raw indexer, custom property
+  defaultCountry = configuration.OcelotGlobalProperty<string>("DefaultCountry"); // typed helper, custom property
+
+  string[] defaultCities = configuration.OcelotGlobalSection("DefaultCities").Get<string[]>(); // custom array
+  defaultCities = configuration.OcelotGlobalProperty<string[]>("DefaultCities"); // custom array
+
+  DefaultInfo defaults = configuration.OcelotGlobalProperty<DefaultInfo>("Defaults"); // custom options object
+
+The same helpers work at the route level, falling back to the ``GlobalConfiguration`` value when the route itself has no custom property defined:
+
+.. code-block:: csharp
+  :emphasize-lines: 2,3
+
+  var routeWeather = configuration.OcelotRoute("/weather/current/{city}"); // by UpstreamPathTemplate
+  var weatherDefaultCity = configuration.OcelotProperty<string>("DefaultCity", routeWeather); // route-level custom property
+  var weatherDefaultCountry = configuration.OcelotProperty<string>("DefaultCountry", routeWeather); // falls back to global if not set on the route
+
+Reading custom properties via Newtonsoft's ``JObject``/``JToken``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If you prefer working with the raw merged JSON, the `ConfigurationBuilderExtensions`_ class adds the equivalent ``OcelotJ*`` helper methods to the ``IConfigurationBuilder`` interface:
+
+.. code-block:: csharp
+  :emphasize-lines: 1,2,3
+
+  JObject jGlobal = configuration.OcelotJGlobalConfiguration();
+  string defaultCountry = configuration.OcelotJGlobalProperty<string>("DefaultCountry"); // custom property
+  string[] defaultCities = configuration.OcelotJGlobalProperty<string[]>("DefaultCities"); // custom array
+  DefaultInfo defaults = configuration.OcelotJGlobalProperty<DefaultInfo>("Defaults"); // custom options object
+
+  JObject jWeather = configuration.OcelotJRoute("/weather/current/{city}"); // case insensitive by default
+  string weatherDefaultCity = jWeather["DefaultCity"].Value<string>(); // custom property via JToken indexer
+  weatherDefaultCity = configuration.OcelotJProperty<string>("DefaultCity", "/weather/current/{city}"); // search route + get property + cast value
+
+Detecting custom properties not defined in the schema
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Sometimes you need to discover which properties of a route or of the ``GlobalConfiguration`` section are *not* part of the Ocelot schema, for example to log them, validate them, or feed them into your own extension.
+The `Ocelot.Samples.Configuration <https://github.com/ThreeMammals/Ocelot/blob/main/samples/Configuration/>`_ sample app demonstrates a small reusable helper for this purpose, based on reflection over the corresponding ``File*`` model class:
+
+.. code-block:: csharp
+
+  public static List<JProperty> OcelotCustomProperties<TFileModel>(this JObject jsonObject)
+  {
+      var schemaProperties = typeof(TFileModel)
+          .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+          .Select(p => p.Name)
+          .ToHashSet();
+
+      return jsonObject.Properties()
+          .Where(p => !schemaProperties.Contains(p.Name))
+          .ToList();
+  }
+
+Given a ``JObject`` obtained through one of the ``OcelotJ*`` helpers described above, custom properties can now be enumerated as follows:
+
+.. code-block:: csharp
+  :emphasize-lines: 2,6
+
+  JObject jRoute = configuration.OcelotJRoute("/weather/current/{city}");
+  List<JProperty> routeCustomProps = jRoute.OcelotCustomProperties<FileRoute>();
+
+  JObject jGlobal = configuration.OcelotJGlobalConfiguration();
+  List<JProperty> globalCustomProps = jGlobal.OcelotCustomProperties<FileGlobalConfiguration>();
+  foreach (JProperty jp in globalCustomProps)
+      Console.WriteLine($"{jp.Name} -> {jp.Value}");
+
+See the :ref:`config-sample` section for the complete walkthrough of this recipe against the sample app's `ocelot-configuration <https://github.com/ThreeMammals/Ocelot/tree/main/samples/Configuration/ocelot-configuration>`_ files.
+
 .. _config-route-metadata:
 
 Extend with ``Metadata``
@@ -948,6 +1119,78 @@ assign the desired number of seconds to the ``DownstreamRoute`` `DefaultTimeoutS
 
 However, keep in mind that the absolute timeout has the lowest priority—therefore, route-level and global timeouts will override this C# property if they are defined.
 
+.. _config-sample:
+
+Sample
+------
+
+  Sample: `Ocelot.Samples.Configuration <https://github.com/ThreeMammals/Ocelot/blob/main/samples/Configuration/>`_
+
+The `Ocelot.Samples.Configuration <https://github.com/ThreeMammals/Ocelot/blob/main/samples/Configuration/>`_ app is dedicated to demonstrating the :doc:`../features/configuration` feature end-to-end: merging several ``ocelot.*.json`` files (see :ref:`config-merging-files`), and then reading both well-known and custom, non-schema properties (see :ref:`config-custom-properties`) from the resulting configuration by using the new Dependency Injection helpers described in this chapter.
+
+The sample's `ocelot-configuration <https://github.com/ThreeMammals/Ocelot/tree/main/samples/Configuration/ocelot-configuration>`_ folder contains the following files, which are merged together at startup as explained in the :ref:`config-merging-files` section:
+
+* ``ocelot.global.json`` defines the ``GlobalConfiguration`` section, including custom properties ``DefaultCountry``, ``DefaultCities`` (a custom array), and ``Defaults`` (a custom options object).
+* ``ocelot.weather.json`` defines a ``/weather/current/{city}`` route with route-level custom properties ``DefaultCity`` and ``DefaultCountry``.
+* ``ocelot.posts.json`` defines a ``/ocelot/posts/{id}`` route, keyed as ``R3``, with no custom properties of its own.
+* ``ocelot.docs.json`` defines a ``/ocelot/docs/{everything}`` route.
+
+The `Program`_.cs file wires up the merging feature first:
+
+.. code-block:: csharp
+  :emphasize-lines: 3
+
+  builder.Configuration
+      .SetBasePath(builder.Environment.ContentRootPath)
+      .AddOcelot("ocelot-configuration", builder.Environment); // multiple environment files (ocelot.*.json) to be merged to ocelot.json file and write it back to disk
+      //.AddOcelot("ocelot-configuration", builder.Environment, MergeOcelotJson.ToMemory); // to be merged to ocelot.json JSON-data and keep it in memory
+
+Then it showcases the new helpers from the `ConfigurationExtensions`_ and `ConfigurationBuilderExtensions`_ classes to read both well-known sections and the ``DefaultCountry``, ``DefaultCities`` and ``Defaults`` custom properties:
+
+.. code-block:: csharp
+
+  var configuration = builder.Configuration;
+  var ocRoot = configuration.OcelotRoot();
+  var ocRoutes = configuration.OcelotRoutes();
+  var ocGlobal = configuration.OcelotGlobalConfiguration();
+  var ocBaseUrl = configuration.OcelotGlobalSection(nameof(FileGlobalConfiguration.BaseUrl));
+  var baseUrl = configuration.OcelotGlobalProperty<string>(nameof(FileGlobalConfiguration.BaseUrl));
+
+  // Custom properties, custom arrays and custom options classes (e.g. DefaultInfo) of the GlobalConfiguration section
+  string defaultCountry = configuration.OcelotGlobalProperty<string>("DefaultCountry");
+  string[] defaultCities = configuration.OcelotGlobalProperty<string[]>("DefaultCities");
+  DefaultInfo defaults = configuration.OcelotGlobalProperty<DefaultInfo>("Defaults");
+
+  // Route-level custom properties, with fallback to global values
+  var routeWeather = configuration.OcelotRoute("/weather/current/{city}");
+  var weatherDefaultCity = configuration.OcelotProperty<string>("DefaultCity", routeWeather);
+  var weatherDefaultCountry = configuration.OcelotProperty<string>("DefaultCountry", routeWeather);
+
+  var routePosts = configuration.OcelotRoute(key: "R3");
+  var postsDefaultCountry = configuration.OcelotProperty<string>("DefaultCountry", routePosts); // no route-level property, reads from global
+
+Finally, the sample also demonstrates the equivalent ``OcelotJ*`` helpers based on Newtonsoft's ``JObject``/``JToken``, together with a sample-local ``OcelotCustomProperties<TFileModel>()`` extension method (declared in the sample's ``Helpers.cs`` file) that detects custom properties of a route or of the ``GlobalConfiguration`` section by comparing them against the corresponding ``File*`` schema class:
+
+.. code-block:: csharp
+
+  string otJson = configuration.OcelotJson(); // JSON of merged ocelot.json file
+  JObject jRoot = configuration.OcelotJObject(); // JObject.Parse(otJson)
+  JArray jRoutes = configuration.OcelotJRoutes();
+  JObject jGlobal = configuration.OcelotJGlobalConfiguration();
+
+  foreach (JToken jRt in jRoutes)
+  {
+      var jRoute = jRt as JObject;
+      var customProps = jRoute.OcelotCustomProperties<FileRoute>();
+      // ... log or process customProps ...
+  }
+
+  var customGlobal = jGlobal.OcelotCustomProperties<FileGlobalConfiguration>();
+  // ... log or process customGlobal ...
+
+Run the sample and observe the console output: it prints the detected routes and then, for every route and for the ``GlobalConfiguration`` section, lists any custom properties that are not part of the Ocelot JSON schema.
+Refer to the :ref:`config-merging-recipes` and :ref:`config-custom-properties` sections above for a detailed explanation of every helper method used in this sample.
+
 """"
 
 .. [#f1] The ":ref:`Merging Files <config-merging-files>`" feature was requested in issue `296`_, since then we extended it in issue `1216`_ (PR `1227`_) as ":ref:`Merging files to memory <config-merging-tomemory>`" subfeature which was released as a part of version `23.2`_.
@@ -956,11 +1199,14 @@ However, keep in mind that the absolute timeout has the lowest priority—theref
 .. [#f4] The ":ref:`config-route-metadata`" feature was requested in issues `738`_ and `1990`_, and it was released as part of version `23.3`_.
 .. [#f5] The initial draft design of the :ref:`config-timeout` feature was implemented in pull request `1824`_ as ``TimeoutDelegatingHandler`` (released in version `23.0`_), but this version supported only the built-in `default timeout of 90 seconds`_.
   The full :ref:`config-timeout` feature was requested in issue `1314`_, implemented in pull request `2073`_, and officially released as part of version `24.1`_.
+.. [#f6] The :ref:`config-custom-properties` feature, including the merging of custom, non-schema JSON properties described in the :ref:`config-merging-recipes` subsection, was requested in issue `651`_ and implemented in pull request `1183`_.
 
 .. _default timeout of 90 seconds: https://github.com/ThreeMammals/Ocelot/blob/24.0.0/src/Ocelot/Requester/MessageInvokerPool.cs#L38
 .. _296: https://github.com/ThreeMammals/Ocelot/issues/296
 .. _585: https://github.com/ThreeMammals/Ocelot/issues/585
+.. _651: https://github.com/ThreeMammals/Ocelot/issues/651
 .. _738: https://github.com/ThreeMammals/Ocelot/issues/738
+.. _1183: https://github.com/ThreeMammals/Ocelot/pull/1183
 .. _1216: https://github.com/ThreeMammals/Ocelot/issues/1216
 .. _1227: https://github.com/ThreeMammals/Ocelot/pull/1227
 .. _1314: https://github.com/ThreeMammals/Ocelot/issues/1314
