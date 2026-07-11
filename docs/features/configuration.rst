@@ -403,7 +403,7 @@ Post merging recipes
 Once the ``ocelot.*.json`` files have been merged, either to the `ocelot.json`_ file on disk or in memory (see :ref:`config-merging-tomemory`), Ocelot exposes two families of extension methods that let you inspect the resulting configuration directly from your `Program`_.cs file:
 
 * The ``Ocelot*`` extension methods of the ``IConfiguration`` interface, declared in the `ConfigurationExtensions`_ class, which navigate the ASP.NET ``IConfiguration``/``IConfigurationSection`` tree.
-* The ``OcelotJ*`` extension methods of the ``IConfigurationBuilder`` interface, declared in the `ConfigurationBuilderExtensions`_ class, which operate on the merged configuration as Newtonsoft's ``JObject``/``JToken`` graph.
+* The ``OcelotJ*`` extension methods of the ``IConfigurationBuilder`` interface, declared in the `ConfigurationBuilderExtensions`_ class, which operate on the merged configuration as Newtonsoft's ``JObject``/``JToken`` graph. The ``J`` in the naming prefix stands for Newtonsoft's ``J*`` (``JObject``/``JToken``/``JArray``/``JProperty``) types returned or consumed by these methods, as opposed to the ``IConfiguration``-based ``Ocelot*`` methods above.
 
   **Note**: The ``builder.Configuration`` property (of type ``ConfigurationManager``) implements both the ``IConfiguration`` and ``IConfigurationBuilder`` interfaces.
   Therefore, all the helpers below can be invoked on that very same ``configuration`` variable, regardless of which interface declares them.
