@@ -305,7 +305,7 @@ public class CircuitBreakerDelegatingHandlerTests : UnitTest
     public async Task SendAsync_WithTimeout_ExceedsTimeout_Returns503AndRecordsFailure()
     {
         int timeoutMs = 100, serviceDelayMs = 500;
-        if (IsCiCd() && RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) // macOS runners are noisier; widen the gap to make timeout deterministic
+        if (IsCiCd() && System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.OSX)) // macOS runners are noisier; widen the gap to make timeout deterministic
         {
             timeoutMs *= 2;
             serviceDelayMs *= 2;
