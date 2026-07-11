@@ -304,7 +304,12 @@ public class CircuitBreakerDelegatingHandlerTests : UnitTest
     [Fact]
     public async Task SendAsync_WithTimeout_ExceedsTimeout_Returns503AndRecordsFailure()
     {
-        const int timeoutMs = 100, serviceDelayMs = 500;
+        int timeoutMs = 100, serviceDelayMs = 500;
+        if (IsCiCd() && RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) // macOS runners are noisier; widen the gap to make timeout deterministic
+        {
+            timeoutMs *= 2;
+            serviceDelayMs *= 2;
+        }
         var opts = new QoSOptions(100, 5000) { Timeout = timeoutMs };
         using var handler = CreateHandler(opts, new DelayedInnerHandler(HttpStatusCode.OK, serviceDelayMs));
 
